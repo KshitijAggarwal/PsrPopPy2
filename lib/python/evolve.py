@@ -52,7 +52,8 @@ def generate(ngen,
              efficiencycut=None,
              nostdout=False,
              nospiralarms=False,
-             keepdead=False):
+             keepdead=False, 
+             makepop=False):
 
     pop = Population()
 
@@ -351,8 +352,9 @@ def generate(ngen,
                     print prog, '\r',
                     sys.stdout.flush()
 
-            # pulsar isn't dead, add to population!
-            pop.population.append(pulsar)
+            # pulsar isn't dead, and makepop True, add the pulsar to population!
+            if makepop == True:
+                pop.population.append(pulsar)
 
         else:
             # pulsar is dead. If no survey list,
@@ -801,6 +803,10 @@ if __name__ == '__main__':
     parser.add_argument('--keepdead', nargs='?', const=True, default=False,
                         help='keep dead pulsars in the population model')
 
+    # make all pulsar population
+    parser.add_argument('--makepop', nargs='?', const=True, default=False,
+                        help='flag to make a population object with all pulsars (def=False)')
+    
     args = parser.parse_args()
 
     # write command line to populate.cmd file
@@ -834,6 +840,8 @@ if __name__ == '__main__':
                    nodeathline=args.nodeathline,
                    efficiencycut=args.eff,
                    nospiralarms=args.nospiralarms,
-                   keepdead=args.keepdead)
+                   keepdead=args.keepdead,
+                   makepop = args.makepop)
 
-    pop.write(outf=args.o)
+    if args.makepop == True:
+        pop.write(outf=args.o)
