@@ -52,7 +52,8 @@ def generate(ngen,
              efficiencycut=None,
              nostdout=False,
              nospiralarms=False,
-             keepdead=False, 
+             keepdead=False,
+             dosurveyList = None,
              makepop=False):
 
     pop = Population()
@@ -141,6 +142,22 @@ def generate(ngen,
         surv.nout = 0  # number outside survey region
         surv.nsmear = 0  # number smeared out
         surv.ntf = 0  # number too faint
+
+    # create dosurvey objects here and put them in a list
+    if dosurveyList is not None:
+        dosurveys = [Survey(s) for s in dosurveyList]
+        # initialise these counters to zero
+        for surv in dosurveys:
+            surv.ndet = 0  # number detected
+            surv.nout = 0  # number outside survey region
+            surv.nsmear = 0  # number smeared out
+            surv.ntf = 0  # number too faint
+
+            # surv.gainpat=pattern
+    else:
+        # make an empty list here - makes some code just a little
+        # simpler - can still loop over an empty list (ie zero times)
+        dosurveys = []
 
     # this is the nitty-gritty loop for generating the pulsars
     while pop.ndet < ngen:
@@ -356,6 +373,34 @@ def generate(ngen,
             if makepop == True:
                 pop.population.append(pulsar)
 
+            # if dosurveys are given, check if pulsar detected or not
+            # in each of the surveys or any of the survey
+            # just a flag to increment if pulsar is detected
+            if dosurveyList is not None:
+                for surv in dosurveys:
+                    SNR = surv.SNRcalc(pulsar, pop)
+
+                    if SNR > surv.SNRlimit:
+                        # SNR is over threshold
+                        # increment survey ndetected
+                        surv.ndet += 1
+                        continue
+
+                    elif SNR == -1:
+                        # pulse is smeared out
+                        surv.nsmear += 1
+                        continue
+
+                    elif SNR == -2:
+                        # pulsar is outside survey region
+                        surv.nout += 1
+                        continue
+
+                    else:
+                        # pulsar is just too faint
+                        surv.ntf += 1
+                        continue
+
         else:
             # pulsar is dead. If no survey list,
             # just increment number of pulsars
@@ -379,6 +424,17 @@ def generate(ngen,
             print "    Number smeared = {0}".format(surv.nsmear)
             print "    Number outside survey area = {0}".format(surv.nout)
 
+        for surv in dosurveys:
+            print "\n  Dosurvey Results for survey '{0}'".format(surv.surveyName)
+            print "    Number detected = {0}".format(surv.ndet)
+            print "    Number too faint = {0}".format(surv.ntf)
+            print "    Number smeared = {0}".format(surv.nsmear)
+            print "    Number outside survey area = {0}".format(surv.nout)
+
+    dosurvey_result = []
+    for surv in dosurveys:
+        dosurvey_result.append([surv.surveyName, surv.ndet, surv.ntf, surv.nsmear, surv.nout])
+
     # save list of arguments into the pop
     #try:
     #    argspec = inspect.getargspec(generate)
@@ -387,7 +443,7 @@ def generate(ngen,
     #except SyntaxError:
      #   pass
 
-    return pop
+    return pop, dosurvey_result
 
 
 def birthVelocity(pulsar, pop):
@@ -807,6 +863,11 @@ if __name__ == '__main__':
     parser.add_argument('--makepop', nargs='?', const=True, default=False,
                         help='flag to make a population object with all pulsars (def=False)')
     
+    # list of target surveys to run model on (if any)
+    parser.add_argument('-dosurveys', metavar='DS', nargs='+', default=None,
+            help='target surveys to run on the population created'
+            )
+
     args = parser.parse_args()
 
     # write command line to populate.cmd file
@@ -815,7 +876,7 @@ if __name__ == '__main__':
         f.write('\n')
 
     # run the code!
-    pop = generate(args.n,
+    pop, dosurvey_result = generate(args.n,
                    surveyList=args.surveys,
                    age_max=args.tmax,
                    lumDistType=args.ldist[0],
@@ -841,6 +902,7 @@ if __name__ == '__main__':
                    efficiencycut=args.eff,
                    nospiralarms=args.nospiralarms,
                    keepdead=args.keepdead,
+                   dosurveyList = args.dosurveys,
                    makepop = args.makepop)
 
     if args.makepop == True:
